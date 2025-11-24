@@ -21,7 +21,8 @@ app.add_middleware(
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
-MODEL_PATH = os.path.join(project_root, "model.pth")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(PROJECT_ROOT, 'models', 'model.pth')
 
 CLASSES = ['Cataract', 'Conjunctivitis', 'Eyelid', 'Jaundice', 'Normal', 'Uveitis']
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
