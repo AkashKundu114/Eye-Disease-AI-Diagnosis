@@ -1,6 +1,6 @@
 # 👁️ OphthalmoAI – Eye Disease Diagnostic System
 
-A full-stack AI-powered application for detecting **6 types of eye diseases** using a deep learning model built on **EfficientNetB3**.
+A full-stack, **AI-powered ophthalmology application** designed to detect **six major eye diseases** using a state-of-the-art deep learning model based on **EfficientNetB3**. The system integrates a **responsive React frontend**, a **secure FastAPI backend**, and an **optimized TensorFlow inference pipeline** to deliver **fast**, **accurate**, **real-world medical predictions**.
 
 ---
 
