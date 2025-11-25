@@ -1,24 +1,52 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import axios from 'axios'
+import Cropper from 'react-easy-crop'
+import getCroppedImg from './cropImage' 
 import { 
   Upload, Activity, AlertTriangle, CheckCircle2, 
   ChevronRight, Stethoscope, ShieldAlert, Pill, 
-  FileText, RefreshCw
+  FileText, RefreshCw, Download, MapPin, Eye, ScanEye
 } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 function App() {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
+  const [heatmap, setHeatmap] = useState(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [showHeatmap, setShowHeatmap] = useState(false)
+
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
+  const [isCropping, setIsCropping] = useState(false)
+
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels)
+  }, [])
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0]
     if (selectedFile) {
       setFile(selectedFile)
       setPreview(URL.createObjectURL(selectedFile))
+      setIsCropping(true)
       setResult(null)
+      setHeatmap(null)
+    }
+  }
+
+  const handleCropConfirm = async () => {
+    try {
+      const croppedImage = await getCroppedImg(preview, croppedAreaPixels)
+      setPreview(URL.createObjectURL(croppedImage))
+      setFile(croppedImage) 
+      setIsCropping(false)
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -29,226 +57,279 @@ function App() {
     formData.append('file', file)
 
     try {
-      const response = await axios.post('http://localhost:8000/predict', formData)
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const response = await axios.post(`${apiUrl}/predict`, formData)
+      
+      if (response.data.error) throw new Error(response.data.error);
       setResult(response.data)
+      setHeatmap(response.data.heatmap)
     } catch (error) {
-      console.error("Error:", error)
-      alert("Could not connect to the AI Brain. Is the backend running?")
+      alert(`Analysis Failed: ${error.message}`)
     } finally {
       setLoading(false)
     }
   }
 
-  const resetApp = () => {
-    setFile(null)
-    setPreview(null)
-    setResult(null)
+  const downloadPDF = () => {
+    if (!result) return;
+    const doc = new jsPDF();
+    
+    doc.setFillColor(41, 128, 185); 
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.text("OphthalmoAI Diagnostic Report", 20, 25);
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 50);
+    doc.text("Ref ID: #AI-" + Math.floor(Math.random()*10000), 160, 50);
+
+    doc.setDrawColor(0);
+    doc.setFillColor(240, 248, 255);
+    doc.roundedRect(20, 60, 170, 40, 3, 3, 'F');
+    
+    doc.setFontSize(16);
+    doc.setTextColor(41, 128, 185);
+    doc.text("AI DIAGNOSIS RESULT", 30, 75);
+    
+    doc.setFontSize(20);
+    doc.setTextColor(200, 0, 0);
+    doc.text(result.diagnosis.toUpperCase(), 30, 90);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Confidence: ${result.confidence.toFixed(1)}%`, 120, 90);
+
+    if (heatmap) {
+        doc.addImage(heatmap, 'JPEG', 20, 110, 80, 80);
+        doc.setFontSize(10);
+        doc.text("Fig 1. Grad-CAM AI Attention Map", 25, 195);
+        doc.text("(Red areas indicate disease focus)", 25, 200);
+    }
+
+    autoTable(doc, {
+      startY: 110,
+      margin: { left: 110 },
+      head: [['Clinical Details']],
+      body: [
+        [`Condition: ${result.details.description}`],
+        [`Severity: ${result.details.severity}`],
+        [`Rec. Action: ${result.details.advice}`],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    let finalY = doc.lastAutoTable.finalY + 10;
+    if (finalY < 200) finalY = 210; 
+
+    doc.setFontSize(14);
+    doc.setTextColor(41, 128, 185);
+    doc.text("Recommended Treatment Plan", 20, finalY);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    let yPos = finalY + 10;
+    
+    result.details.treatment.forEach(t => {
+        doc.text(`• ${t}`, 25, yPos);
+        yPos += 7;
+    });
+
+    doc.text("Symptoms to Watch For:", 110, finalY);
+    let yPosSym = finalY + 10;
+    result.details.symptoms.forEach(s => {
+        doc.text(`• ${s}`, 115, yPosSym);
+        yPosSym += 7;
+    });
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Find a Specialist: https://www.google.com/maps/search/ophthalmologist+near+me", 20, 280);
+    doc.text("Disclaimer: AI screening tool. Not a substitute for professional medical advice.", 20, 285);
+
+    doc.save("Eye_Health_Report.pdf");
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-100">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-['Inter']">
       
-      {/* NAVBAR */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 backdrop-blur-md bg-white/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <Activity className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">
-              OphthalmoAI
-            </span>
+      {/* CROPPER MODAL */}
+      {isCropping && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black bg-opacity-90">
+          <div className="relative w-full max-w-xl h-[60vh] bg-gray-900 rounded-lg overflow-hidden">
+            <Cropper
+              image={preview}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+            />
           </div>
-          <div className="text-xs font-medium text-slate-400 border border-slate-200 px-3 py-1 rounded-full">
-            v2.0 Pro • EfficientNetB3
+          <div className="flex gap-4 mt-6">
+            <button onClick={() => setIsCropping(false)} className="px-6 py-2 text-white bg-gray-600 rounded-lg">Cancel</button>
+            <button onClick={handleCropConfirm} className="px-6 py-2 font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-500">Confirm Crop</button>
+          </div>
+          <p className="mt-2 text-sm text-white">Zoom and drag to center the eye.</p>
+        </div>
+      )}
+
+      <nav className="sticky top-0 z-40 bg-white border-b border-slate-200">
+        <div className="flex items-center justify-between h-16 px-4 mx-auto max-w-7xl">
+          <div className="flex items-center gap-2 text-xl font-bold text-blue-900">
+            <Activity className="w-6 h-6 text-blue-600" /> OphthalmoAI
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="px-4 py-12 mx-auto max-w-7xl">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           
-          {/* LEFT COLUMN - UPLOAD */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-1">
-              <div className="p-6 border-b border-slate-100">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-blue-600" />
-                  Input Scan
-                </h2>
-              </div>
-              
-              <div className="p-6">
-                {!preview ? (
-                  <label className="flex flex-col items-center justify-center w-full h-80 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer bg-slate-50 hover:bg-blue-50 hover:border-blue-400 transition-all group">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <div className="bg-white p-4 rounded-full shadow-sm mb-4 group-hover:scale-110 transition-transform">
-                        <Upload className="w-8 h-8 text-blue-500" />
-                      </div>
-                      <p className="mb-2 text-sm text-slate-600 font-medium">Click to upload analysis image</p>
-                      <p className="text-xs text-slate-400">JPG, PNG supported</p>
-                    </div>
-                    <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
-                  </label>
-                ) : (
-                  <div className="relative group rounded-2xl overflow-hidden shadow-md">
-                    <img src={preview} alt="Scan" className="w-full h-80 object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button onClick={resetApp} className="bg-white text-slate-900 px-4 py-2 rounded-full font-medium text-sm flex items-center gap-2 hover:bg-slate-100">
-                        <RefreshCw className="w-4 h-4" /> Change Image
-                      </button>
-                    </div>
+          {/* LEFT: Upload & Preview */}
+          <div className="space-y-6 lg:col-span-5">
+            <div className="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+              {!preview ? (
+                <label className="flex flex-col items-center justify-center transition border-2 border-dashed cursor-pointer h-80 border-slate-300 rounded-2xl bg-slate-50 hover:bg-blue-50">
+                  <Upload className="w-10 h-10 mb-3 text-blue-400" />
+                  <span className="font-medium text-slate-600">Upload Eye Scan</span>
+                  <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
+                </label>
+              ) : (
+                <div className="space-y-4">
+                  <div className="relative overflow-hidden bg-black shadow-md rounded-2xl h-80 group">
+                    <img 
+                        src={showHeatmap && heatmap ? heatmap : preview} 
+                        alt="Scan" 
+                        className="object-contain w-full h-full" 
+                    />
+                    {heatmap && (
+                        <button 
+                            onClick={() => setShowHeatmap(!showHeatmap)}
+                            className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1.5 rounded-full text-sm flex items-center gap-2 hover:bg-black"
+                        >
+                            {showHeatmap ? <Eye className="w-4 h-4"/> : <ScanEye className="w-4 h-4"/>}
+                            {showHeatmap ? "Show Original" : "Show AI Vision"}
+                        </button>
+                    )}
                   </div>
-                )}
+                  <button onClick={resetApp} className="flex items-center justify-center w-full gap-2 py-2 rounded-lg text-slate-500 hover:bg-slate-100">
+                    <RefreshCw className="w-4 h-4" /> Upload New Image
+                  </button>
+                </div>
+              )}
 
-                <button
-                  onClick={handleAnalyze}
-                  disabled={!file || loading}
-                  className={`w-full mt-6 py-4 px-6 rounded-xl font-bold text-white shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-all
-                    ${loading 
-                      ? 'bg-slate-400 cursor-not-allowed shadow-none' 
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:translate-y-[-2px] hover:shadow-blue-500/40 active:translate-y-[0px]'
-                    }`}
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      Run Diagnostics <ChevronRight className="w-5 h-5" />
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                onClick={handleAnalyze}
+                disabled={!file || loading}
+                className={`w-full mt-4 py-4 rounded-xl font-bold text-white shadow-lg transition-all flex justify-center items-center gap-2
+                  ${loading ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                {loading ? 'Analyzing...' : 'Run Diagnosis'} <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          {/* RIGHT COLUMN - RESULTS */}
+          {/* RIGHT: Results */}
           <div className="lg:col-span-7">
             {result ? (
-              <div className="animate-fade-in space-y-6">
-                
-                {/* MAIN DIAGNOSIS CARD */}
-                <div className={`rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6
-                  ${result.diagnosis === 'Normal' 
-                    ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20' 
-                    : 'bg-gradient-to-br from-rose-500 to-red-600 shadow-rose-500/20'}`}>
-                  
+              <div className="space-y-6 animate-fade-in">
+                {/* Header Card */}
+                <div className={`p-6 rounded-3xl shadow-xl text-white flex justify-between items-center
+                  ${result.diagnosis === 'Normal' ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : 'bg-gradient-to-r from-red-500 to-rose-600'}`}>
                   <div>
-                    <div className="flex items-center gap-2 opacity-90 mb-1 text-sm font-medium tracking-wide uppercase">
-                      Analysis Complete
-                    </div>
-                    <h2 className="text-4xl font-bold mb-2">{result.diagnosis}</h2>
-                    <p className="opacity-90 flex items-center gap-2">
-                      <span className="bg-white/20 px-2 py-1 rounded-md text-sm backdrop-blur-sm">
-                        {result.confidence.toFixed(1)}% Confidence
-                      </span>
-                    </p>
+                    <p className="mb-1 text-sm font-medium tracking-wider uppercase opacity-90">Detection Result</p>
+                    <h2 className="text-3xl font-bold">{result.diagnosis.replace(/_/g, ' ')}</h2>
+                    <p className="mt-1 opacity-90">{result.confidence.toFixed(1)}% Confidence Score</p>
                   </div>
-                  
-                  <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-md">
-                    {result.diagnosis === 'Normal' ? <CheckCircle2 className="w-12 h-12" /> : <AlertTriangle className="w-12 h-12" />}
+                  <div className="p-3 rounded-full bg-white/20 backdrop-blur-sm">
+                    {result.diagnosis === 'Normal' ? <CheckCircle2 className="w-10 h-10" /> : <AlertTriangle className="w-10 h-10" />}
                   </div>
                 </div>
 
-                {/* DETAILS TABS */}
-                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="flex border-b border-slate-100">
-                    <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon={<FileText className="w-4 h-4" />} label="Overview" />
-                    <TabButton active={activeTab === 'treatment'} onClick={() => setActiveTab('treatment')} icon={<Pill className="w-4 h-4" />} label="Treatment" />
-                    <TabButton active={activeTab === 'doctor'} onClick={() => setActiveTab('doctor')} icon={<Stethoscope className="w-4 h-4" />} label="Doctor's Note" />
+                {/* Action Bar */}
+                <div className="flex gap-3">
+                    <a 
+                        href={`https://www.google.com/maps/search/ophthalmologist+near+me`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex items-center justify-center flex-1 gap-2 p-4 font-semibold text-blue-700 transition bg-white border shadow-sm border-slate-200 rounded-xl hover:bg-blue-50"
+                    >
+                        <MapPin className="w-5 h-5" /> Find Doctors Nearby
+                    </a>
+                    <button 
+                        onClick={downloadPDF}
+                        className="flex items-center justify-center flex-1 gap-2 p-4 font-semibold text-white transition bg-blue-600 shadow-md rounded-xl hover:bg-blue-700"
+                    >
+                        <Download className="w-5 h-5" /> Download Full Report
+                    </button>
+                </div>
+
+                {/* Details Panel */}
+                <div className="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+                  <div className="flex gap-6 pb-4 mb-4 overflow-x-auto border-b border-slate-100">
+                     {['Overview', 'Treatment', 'Precautions'].map(tab => (
+                         <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab.toLowerCase())}
+                            className={`font-medium pb-2 border-b-2 transition-colors ${activeTab === tab.toLowerCase() ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}
+                         >
+                            {tab}
+                         </button>
+                     ))}
                   </div>
 
-                  <div className="p-8 min-h-[300px]">
+                  <div className="min-h-[200px]">
                     {activeTab === 'overview' && (
-                      <div className="animate-fade-in space-y-4">
-                        <h3 className="text-xl font-bold text-slate-800">Condition Details</h3>
-                        <p className="text-slate-600 leading-relaxed">{result.details.description}</p>
-                        
-                        <div className="mt-6">
-                          <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Common Symptoms</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {result.details.symptoms.map((sym, i) => (
-                              <div key={i} className="flex items-start gap-2 text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
-                                {sym}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="space-y-4">
+                            <p className="text-lg leading-relaxed text-slate-600">{result.details.description}</p>
+                            <div className="p-4 border bg-slate-50 rounded-xl border-slate-100">
+                                <h4 className="flex items-center gap-2 mb-2 font-bold text-slate-700">
+                                    <ShieldAlert className="w-4 h-4 text-amber-500" /> Severity: {result.details.severity}
+                                </h4>
+                                <p className="text-sm text-slate-500">{result.details.advice}</p>
+                            </div>
                         </div>
-                      </div>
                     )}
 
                     {activeTab === 'treatment' && (
-                      <div className="animate-fade-in space-y-6">
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Recommended Actions</h4>
-                          <div className="space-y-3">
+                        <ul className="space-y-3">
                             {result.details.treatment.map((t, i) => (
-                              <div key={i} className="flex items-center gap-3 p-4 bg-blue-50/50 border border-blue-100 rounded-xl text-blue-800">
-                                <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                                {t}
-                              </div>
+                                <li key={i} className="flex items-start gap-3 p-3 text-green-800 rounded-lg bg-green-50">
+                                    <Pill className="w-5 h-5 mt-0.5" />
+                                    {t}
+                                </li>
                             ))}
-                          </div>
-                        </div>
-                      </div>
+                        </ul>
                     )}
 
-                    {activeTab === 'doctor' && (
-                      <div className="animate-fade-in">
-                        <div className={`p-6 rounded-xl border-l-4 ${result.diagnosis === 'Normal' ? 'bg-emerald-50 border-emerald-500' : 'bg-amber-50 border-amber-500'}`}>
-                          <h4 className="font-bold flex items-center gap-2 mb-2">
-                            <ShieldAlert className="w-5 h-5" /> Clinical Recommendation
-                          </h4>
-                          <p className="text-slate-700">{result.details.severity === 'None' ? "Routine Checkup Recommended" : "Professional Consultation Required"}</p>
-                        </div>
-                        
-                        <div className="mt-6 space-y-4">
-                          <p className="text-slate-600">
-                            <strong>Assessment:</strong> The AI has detected patterns consistent with {result.diagnosis}. 
-                            {result.diagnosis !== 'Normal' && " This requires clinical correlation."}
-                          </p>
-                          
-                          <div className="bg-slate-900 text-slate-300 p-4 rounded-lg text-sm font-mono">
-                            SEVERITY_LEVEL: {result.details.severity.toUpperCase()}
-                          </div>
-                        </div>
-                      </div>
+                    {activeTab === 'precautions' && (
+                        <ul className="space-y-3">
+                           {result.details.symptoms.map((s, i) => (
+                                <li key={i} className="flex items-center gap-3 text-slate-700">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                    Watch for: {s}
+                                </li>
+                           ))}
+                        </ul>
                     )}
                   </div>
                 </div>
 
               </div>
             ) : (
-              <div className="h-full min-h-[500px] bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center p-8">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                  <Activity className="w-10 h-10 text-slate-300" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-400">Awaiting Scan</h3>
-                <p className="text-slate-400 max-w-xs mx-auto mt-2">Upload an eye image on the left panel to generate a comprehensive AI medical report.</p>
+              <div className="h-full min-h-[400px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+                <Stethoscope className="w-16 h-16 mb-4 opacity-20" />
+                <p>Upload scan to generate report</p>
               </div>
             )}
           </div>
-          
         </div>
       </main>
     </div>
   )
 }
-
-const TabButton = ({ active, onClick, icon, label }) => (
-  <button 
-    onClick={onClick}
-    className={`flex-1 py-4 flex items-center justify-center gap-2 text-sm font-medium transition-all relative
-      ${active ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
-  >
-    {icon}
-    {label}
-    {active && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
-  </button>
-)
 
 export default App
