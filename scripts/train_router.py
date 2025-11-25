@@ -15,7 +15,7 @@ MODEL_SAVE_PATH = os.path.join(PROJECT_ROOT, 'models', 'router.pth')
 BATCH_SIZE = 32 
 IMG_SIZE = 224
 EPOCHS = 15
-TARGET_SAMPLES_PER_CLASS = 5000
+TARGET_SAMPLES_PER_CLASS = 2000
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
