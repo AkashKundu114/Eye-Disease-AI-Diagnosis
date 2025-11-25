@@ -23,6 +23,10 @@ backend/requirements.txt
 
 dataset/
 
+scripts/train_surface.py
+scripts/train_anterior.py
+scripts/train_eyelid.py
+
 models/
 *.pth
 *.keras
