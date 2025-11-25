@@ -104,7 +104,6 @@ function App() {
     const doc = new jsPDF();
     const brandColor = [0, 77, 153]; 
     const accentColor = [240, 248, 255];
-    
     const addHeader = (pageTitle) => {
         doc.setFillColor(...brandColor);
         doc.rect(0, 0, 210, 30, 'F');
@@ -235,6 +234,19 @@ function App() {
         headStyles: { fillColor: [100, 100, 100] },
     });
 
+    const statsData = Object.entries(result.probabilities)
+        .sort(([, a], [, b]) => b - a)
+        .map(([label, percentage]) => [label.replace(/_/g, ' '), `${percentage.toFixed(1)}%`]);
+
+    doc.text("7. Differential Diagnosis (AI Confidence)", 15, doc.lastAutoTable.finalY + 15);
+    autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [['Potential Condition', 'Match Probability']],
+        body: statsData,
+        theme: 'striped',
+        headStyles: { fillColor: [70, 70, 70] },
+    });
+
     addFooter(2);
 
     doc.addPage();
@@ -261,7 +273,7 @@ function App() {
     doc.setTextColor(0, 77, 153);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("7. Find Specialized Care", 15, yPos);
+    doc.text("8. Find Specialized Care", 15, yPos);
 
     yPos += 10;
     doc.setFillColor(245, 245, 245);
@@ -332,13 +344,12 @@ function App() {
                     </div>
                 )}
 
-                {/* UPDATED SYMPTOM QUESTIONNAIRE (FIXED VISIBILITY) */}
+                {/* UPDATED SYMPTOM QUESTIONNAIRE */}
                 {preview && !result && (
                     <div className="p-4 mt-6 space-y-4 border border-blue-100 bg-blue-50 rounded-xl animate-fade-in">
                         <h3 className="flex items-center gap-2 font-bold text-blue-900"><HelpCircle className="w-4 h-4"/> Patient Check</h3>
                         
                         <div className="grid grid-cols-2 gap-4">
-                            {/* Basic */}
                             <div>
                                 <label className="block mb-1 text-xs font-bold text-slate-500">Pain Level</label>
                                 <select value={pain} onChange={(e) => setPain(e.target.value)} className="w-full p-2 text-sm border rounded">
@@ -351,8 +362,6 @@ function App() {
                                     <option>No</option><option>Yes</option><option>Not Sure</option>
                                 </select>
                             </div>
-
-                            {/* Advanced (Fixed visibility) */}
                             <div>
                                 <label className="block mb-1 text-xs font-bold text-slate-500">Itchy?</label>
                                 <select value={itch} onChange={(e) => setItch(e.target.value)} className="w-full p-2 text-sm border rounded">
