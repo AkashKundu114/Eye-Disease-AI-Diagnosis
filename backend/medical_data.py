@@ -90,9 +90,7 @@ MEDICAL_INFO = {
             "Yellowing of the skin",
             "Dark or brown-colored urine",
             "Pale, clay-colored stools",
-            "Itchy skin (Pruritus)",
-            "Fatigue, nausea, and abdominal pain",
-            "Unexplained weight loss"
+            "Fatigue, nausea, and abdominal pain"
         ],
         'treatment': [
             "The eye condition cannot be treated directly; the underlying systemic cause must be addressed",

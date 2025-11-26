@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+const now = new Date();
+const timestamp = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}_${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
 
 const TabButton = ({ active, onClick, icon, label }) => (
   <button 
@@ -338,8 +340,8 @@ function App() {
     doc.textWithLink("CLICK HERE TO OPEN GOOGLE MAPS", 25, yPos + 40, { url: mapUrl });
 
     addFooter(3);
-
-    doc.save(`Eye_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+    
+    doc.save(`Eye_Report_${timestamp}.pdf`);
   }
 
   return (
@@ -520,8 +522,8 @@ function App() {
                 {/* TABBED REPORT PANEL */}
                 <div className="overflow-hidden bg-white border shadow-lg rounded-3xl border-slate-200">
                     <div className="flex overflow-x-auto border-b border-slate-100 scrollbar-hide">
-                        <TabButton active={activeTab === 'treatment'} onClick={() => setActiveTab('treatment')} icon={<Pill className="w-4 h-4" />} label="Plan" />
-                        <TabButton active={activeTab === 'doctor'} onClick={() => setActiveTab('doctor')} icon={<Stethoscope className="w-4 h-4" />} label="Doctor" />
+                        <TabButton active={activeTab === 'treatment'} onClick={() => setActiveTab('treatment')} icon={<Pill className="w-4 h-4" />} label=" Treatment Plan" />
+                        <TabButton active={activeTab === 'doctor'} onClick={() => setActiveTab('doctor')} icon={<Stethoscope className="w-4 h-4" />} label="Doctor's Note" />
                         <TabButton active={activeTab === 'symptoms'} onClick={() => setActiveTab('symptoms')} icon={<ClipboardList className="w-4 h-4" />} label="Symptoms" />
                         <TabButton active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} icon={<Layers className="w-4 h-4" />} label="AI Stats" />
                     </div>
