@@ -1,7 +1,13 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
 pillow
 numpy
 grad-cam
 opencv-python-headless
+torch
+torchvision
+anthropic
+httpx
+python-dotenv
+pydantic
