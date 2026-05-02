@@ -482,7 +482,7 @@ function App() {
                   
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-2 text-xs font-bold tracking-wider uppercase opacity-90">
-                      <Activity className="w-4 h-4" /> AI Assessment Complete
+                      <Activity className="w-4 h-4" /> Assessment Complete
                     </div>
                     <h2 className="mb-2 text-3xl font-bold sm:text-4xl">{result.diagnosis.replace(/_/g, ' ')}</h2>
                     <div className="inline-flex items-center gap-2 px-3 py-1 text-sm font-medium rounded-full bg-white/20 backdrop-blur-sm">

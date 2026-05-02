@@ -21,6 +21,7 @@ frontend/.env.production.local
 
 dataset/
 scripts/pycache/
+sample/
 
 *.keras
 *.h5
