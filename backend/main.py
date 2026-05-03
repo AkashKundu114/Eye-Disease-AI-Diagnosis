@@ -296,6 +296,12 @@ async def predict(
         import traceback
         traceback.print_exc()
         return {"error": f"Analysis failed: {str(e)}"}
+        
+    finally:
+        # Force PyTorch to release GPU memory so LLaVA has room to load
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            gc.collect()
 
 
 @app.post("/chat")
@@ -317,22 +323,21 @@ async def chat_endpoint(request: ChatRequest):
             f"Note: This is an AI screening result only, not a clinical diagnosis."
         )
 
-    # Build message history for the LLM
-    messages = []
-    for msg in request.history:
-        if msg.role in ("user", "assistant"):
-            messages.append({"role": msg.role, "content": msg.content})
-    messages.append({"role": "user", "content": request.message})
-
     anthropic_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-    ollama_url = os.getenv("OLLAMA_URL", "").strip()
-    ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2").strip()
+    ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434").strip() 
+    ollama_model = os.getenv("OLLAMA_MODEL", "moondream").strip() 
 
     reply = ""
 
     try:
         if anthropic_key:
             # ── Anthropic Claude ──────────────────────────────────────────
+            messages = []
+            for msg in request.history:
+                if msg.role in ("user", "assistant"):
+                    messages.append({"role": msg.role, "content": msg.content})
+            messages.append({"role": "user", "content": request.message})
+            
             import anthropic
             client = anthropic.AsyncAnthropic(api_key=anthropic_key)
             response = await client.messages.create(
@@ -344,11 +349,31 @@ async def chat_endpoint(request: ChatRequest):
             reply = response.content[0].text
 
         elif ollama_url:
-            # ── Ollama Local LLM ─────────────────────────────────────────
+            # ── Ollama Local LLM (LLaVA Vision Integration) ───────────────
             import httpx
+            
+            # Extract base64 image (heatmap) from diagnosis context
+            base64_images = []
+            if request.diagnosis_context and request.diagnosis_context.get('heatmap'):
+                heatmap_data = request.diagnosis_context['heatmap']
+                if "," in heatmap_data:
+                    # Strip the 'data:image/jpeg;base64,' prefix
+                    base64_images.append(heatmap_data.split(",")[1])
+
+            messages = [{"role": "system", "content": system}]
+            for msg in request.history:
+                if msg.role in ("user", "assistant"):
+                    messages.append({"role": msg.role, "content": msg.content})
+            
+            # Attach the image to the current user message so LLaVA can see it
+            current_msg = {"role": "user", "content": request.message}
+            if base64_images:
+                current_msg["images"] = base64_images
+            messages.append(current_msg)
+
             payload = {
                 "model": ollama_model,
-                "messages": [{"role": "system", "content": system}] + messages,
+                "messages": messages,
                 "stream": False,
                 "options": {"temperature": 0.7}
             }
@@ -356,7 +381,7 @@ async def chat_endpoint(request: ChatRequest):
                 resp = await client.post(
                     f"{ollama_url.rstrip('/')}/api/chat",
                     json=payload,
-                    timeout=90.0
+                    timeout=120.0 # Increased timeout since vision processing takes longer
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -366,13 +391,11 @@ async def chat_endpoint(request: ChatRequest):
             # ── No LLM Configured ─────────────────────────────────────────
             reply = (
                 "The AI Doctor chat is not configured yet. To enable it:\n\n"
-                "**Option 1 – Anthropic Claude (Cloud)**\n"
-                "Set the `ANTHROPIC_API_KEY` environment variable.\n\n"
-                "**Option 2 – Ollama (Local/Private)**\n"
+                "**Ollama Local Vision**\n"
                 "1. Install Ollama from https://ollama.ai\n"
-                "2. Run: `ollama pull llama3.2`\n"
-                "3. Set `OLLAMA_URL=http://localhost:11434` and `OLLAMA_MODEL=llama3.2`\n\n"
-                "Once configured, I can answer your questions about eye health, symptoms, and treatment options."
+                "2. Run: `ollama pull llava`\n"
+                "3. Ensure Ollama is running.\n\n"
+                "Once configured, I can analyze your images and answer your questions."
             )
 
     except Exception as e:

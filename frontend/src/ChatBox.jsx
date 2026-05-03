@@ -301,7 +301,7 @@ const ChatBot = ({ diagnosisContext }) => {
                   </button>
                 </div>
                 <p className="text-center text-[9px] mt-1.5" style={{ color: '#94a3b8' }}>
-                  Powered by Claude AI · Press Enter to send
+                  Powered by LLaVA Vision AI · Press Enter to send
                 </p>
               </div>
             </>

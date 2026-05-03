@@ -602,7 +602,7 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <Microscope className="w-5 h-5" /> Run AI Diagnosis
+                      Run AI Diagnosis
                       <ChevronRight className="w-5 h-5 ml-auto" />
                     </>
                   )}
