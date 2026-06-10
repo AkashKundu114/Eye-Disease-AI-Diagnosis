@@ -102,22 +102,6 @@ OphthalmoAI/
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Deep Learning** | PyTorch 2.1+, EfficientNet-B4, MobileNetV3-Large |
-| **Explainability** | pytorch-grad-cam (Grad-CAM) |
-| **Backend** | FastAPI, Uvicorn, Pydantic |
-| **Image Processing** | Pillow, OpenCV (headless), NumPy |
-| **LLM Chat** | Anthropic Claude API *or* Ollama (llama3.2:3b) |
-| **Frontend** | React 19, Vite 7, Tailwind CSS 3 |
-| **PDF Reports** | jsPDF, jspdf-autotable |
-| **HTTP Client** | Axios |
-| **Image Crop** | react-easy-crop |
-
----
-
 ## Prerequisites
 
 - **Python** 3.10+
@@ -148,12 +132,6 @@ source venv/bin/activate
 ```bash
 # CUDA 12.4 — check https://pytorch.org/get-started/locally/ for your version
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-```
-
-**Verify GPU detection:**
-
-```bash
-python scripts/check_setup.py
 ```
 
 **Install remaining backend dependencies:**
@@ -270,40 +248,6 @@ The app will open at `http://localhost:5173`.
 npm run build
 # Output in frontend/dist/
 ```
-
----
-
-## Configuration (.env)
-
-Create a `.env` file in the **project root** (next to `backend/`):
-
-```env
-# ── LLM Chat Backend (choose one) ──────────────────────────────
-
-# Option A: Anthropic Claude (recommended for quality)
-# Get your key at https://console.anthropic.com
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-
-# Option B: Local Ollama (free, no API key required)
-# 1. Install Ollama: https://ollama.ai
-# 2. Pull a model: ollama pull llama3.2:3b
-# 3. Run: ollama serve
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2:3b
-```
-
-**Priority:** If `ANTHROPIC_API_KEY` is set, Claude is used. If only `OLLAMA_URL` is set, Ollama is used. If neither is configured, the chat endpoint returns setup instructions.
-
-**VRAM guidance for Ollama on RTX 3050 (6 GB):**
-
-| Model | VRAM Required | Notes |
-|-------|--------------|-------|
-| `llama3.2:3b` | ~2.5 GB | ✅ Recommended — leaves headroom for vision models |
-| `llama3.2:1b` | ~1 GB | ✅ Fastest option |
-| `llava:7b` | ~5 GB | ⚠ Tight — disable inference GPU cache |
-| `llama3.1:8b` | ~5.5 GB | ⚠ Very tight on 6 GB |
-
-> By default, Ollama is configured with `"num_gpu": 0` in the backend, forcing CPU-only inference to avoid VRAM conflicts with the PyTorch vision models. Remove this setting if you have enough VRAM to run both.
 
 ---
 
@@ -440,7 +384,6 @@ Sends a message to the AI Doctor chatbot.
 | **Grad-CAM Heatmaps** | Visual attention maps showing which image regions drove the diagnosis |
 | **Symptom Cross-Check** | Rule-based engine that validates AI diagnosis against reported symptoms |
 | **Clinical Safety Alerts** | Flags dangerous diagnosis/symptom mismatches (e.g. severe pain in conjunctivitis) |
-| **AI Doctor Chat** | Contextual ophthalmology Q&A powered by Claude or Ollama |
 | **PDF Report Export** | 3-page clinical report with images, differential diagnosis, and treatment protocol |
 | **Text-to-Speech** | Reads the diagnosis and clinical advice aloud via the Web Speech API |
 | **Image Crop Tool** | Built-in crop interface to focus on the region of interest before analysis |
@@ -448,24 +391,6 @@ Sends a message to the AI Doctor chatbot.
 
 ---
 
-## Training Details
-
-| Hyperparameter | Router | Specialists |
-|---------------|--------|-------------|
-| Architecture | MobileNetV3-Large | EfficientNet-B4 |
-| Input size | 224 × 224 | 380 × 380 |
-| Batch size | 32 | 4 (×8 accumulation = 32 effective) |
-| Optimiser | Adam (lr=1e-3) | AdamW (lr=1e-4, wd=1e-4) |
-| Scheduler | StepLR (step=7, γ=0.1) | CosineAnnealingLR |
-| Epochs | 25 | 25 |
-| Mixed Precision | ❌ | ✅ (AMP) |
-| Augmentations | Rotation, RandomCrop, Flip, ColorJitter | Rotation, RandomCrop, Flip, ColorJitter |
-| Class balancing | WeightedRandomSampler | WeightedRandomSampler |
-| Virtual samples/epoch | 5000 × num_groups | 5000 × num_classes |
-
-All models are fine-tuned from ImageNet pre-trained weights (`weights='DEFAULT'`).
-
----
 
 ## Troubleshooting
 
