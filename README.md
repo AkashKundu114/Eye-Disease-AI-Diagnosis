@@ -392,31 +392,6 @@ Sends a message to the AI Doctor chatbot.
 ---
 
 
-## Troubleshooting
-
-**`ModuleNotFoundError: No module named 'torch'`**
-→ Ensure your virtual environment is activated and PyTorch was installed with the CUDA wheel, not from `requirements.txt`.
-
-**`Router model not found at models/router.pth`**
-→ Run `python scripts/train_router.py` before starting the backend.
-
-**CUDA out of memory during training**
-→ Reduce `BATCH_SIZE` from 4 to 2 in the training scripts, or increase `ACCUMULATION_STEPS` to compensate.
-
-**Chat endpoint returns setup instructions**
-→ Neither `ANTHROPIC_API_KEY` nor `OLLAMA_URL` is set in `.env`. See [Configuration](#configuration-env).
-
-**Ollama connection refused**
-→ Ensure `ollama serve` is running in a separate terminal and the model has been pulled (`ollama pull llama3.2:3b`).
-
-**Frontend can't reach the backend**
-→ Check `VITE_API_URL` in `frontend/.env.local` and ensure CORS is not blocked. The backend allows all origins by default in development.
-
-**Grad-CAM heatmap missing**
-→ Grad-CAM requires `grad-cam>=1.5.4`. The Adnexal (Eyelid-only) group uses direct pass-through — no heatmap is generated for that group as no specialist model runs inference.
-
----
-
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
