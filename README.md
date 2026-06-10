@@ -8,31 +8,6 @@
 
 A full-stack, AI-powered ophthalmology screening application that detects **7 eye conditions** using a **hierarchical deep learning pipeline** — a MobileNetV3 router followed by specialist EfficientNet-B4 models — with Grad-CAM visual explanations, symptom cross-checking, and an integrated AI doctor chatbot.
 
-> ⚕ **Medical Disclaimer:** OphthalmoAI is a research and educational tool. It is **not a substitute** for professional medical diagnosis, advice, or treatment. Always consult a qualified ophthalmologist.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Detectable Conditions](#detectable-conditions)
-- [Model Architecture](#model-architecture)
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-  - [1. Clone & Environment Setup](#1-clone--environment-setup)
-  - [2. Dataset Preparation](#2-dataset-preparation)
-  - [3. Model Training](#3-model-training)
-  - [4. Backend Setup](#4-backend-setup)
-  - [5. Frontend Setup](#5-frontend-setup)
-- [Configuration (.env)](#configuration-env)
-- [Running the Application](#running-the-application)
-- [API Reference](#api-reference)
-- [Features](#features)
-- [Training Details](#training-details)
-- [Troubleshooting](#troubleshooting)
-
 ---
 
 ## Overview
@@ -60,36 +35,6 @@ This approach mirrors clinical ophthalmology practice where a triage step preced
 | **Normal** | All Groups | None |
 
 ---
-
-## Model Architecture
-
-```
-Input Image (380×380 px)
-        │
-        ▼
-┌──────────────────────┐
-│  Router              │  MobileNetV3-Large
-│  (3 output classes)  │  224×224 px input
-└──────────┬───────────┘
-           │
-     ┌─────┴─────────────────────┐
-     │           │               │
-     ▼           ▼               ▼
- Adnexal    Anterior         Ocular
- Group      Segment          Surface
-            │                │
-     ┌──────▼─────┐  ┌───────▼──────┐
-     │ EfficientNet│  │ EfficientNet │
-     │    B4       │  │    B4        │
-     │ 2 classes   │  │ 4 classes    │
-     └─────────────┘  └─────────────┘
-           │                 │
-           └────────┬────────┘
-                    ▼
-          Grad-CAM Heatmap +
-          Softmax Probabilities +
-          Symptom Cross-Check
-```
 
 **Key architectural choices:**
 - **EfficientNet-B4** — superior accuracy/compute ratio for medical imaging
